@@ -100,7 +100,9 @@ function renderWorkspace() {
 
   if (dump) container.appendChild(renderCard(dump));
 
-  if (regular.length) {
+  const hasCompletati = completati && state.tasks.some(t => t.list_id === completati.id);
+
+  if (regular.length || hasCompletati) {
     const grid = document.createElement('div');
     grid.className = 'cards-grid';
     const cols = Array.from({ length: 4 }, () => {
@@ -110,6 +112,7 @@ function renderWorkspace() {
       return col;
     });
     regular.forEach((l, i) => cols[i % 4].appendChild(renderCard(l)));
+    if (hasCompletati) cols[regular.length % 4].appendChild(renderCard(completati));
     bindGridDrag(grid);
     container.appendChild(grid);
   } else if (!dump) {
@@ -117,10 +120,6 @@ function renderWorkspace() {
     empty.className = 'empty-state';
     empty.textContent = 'Nessuna lista. Clicca "+ Nuova lista" per iniziare.';
     container.appendChild(empty);
-  }
-
-  if (completati && state.tasks.some(t => t.list_id === completati.id)) {
-    container.appendChild(renderCard(completati));
   }
 }
 
@@ -134,7 +133,7 @@ function renderCard(list) {
 
   const card = document.createElement('div');
   const isSpecial = list.is_dump || list.is_completed;
-  card.className = `card${list.is_dump ? ' dump' : ''}${list.is_completed ? ' dump completati' : ''}`;
+  card.className = `card${list.is_dump ? ' dump' : ''}${list.is_completed ? ' completati' : ''}`;
   card.dataset.listId = list.id;
   if (!isSpecial) card.dataset.cols = list.width_cols;
 
@@ -513,7 +512,7 @@ function bindGridDrag(grid) {
     if (!targetCard && !targetCol) return;
     if (targetCard && targetCard.dataset.listId === draggedListId) return;
 
-    const regular = state.lists.filter(l => !l.is_dump).sort((a, b) => a.position - b.position);
+    const regular = state.lists.filter(l => !l.is_dump && !l.is_completed).sort((a, b) => a.position - b.position);
     const fromIdx = regular.findIndex(l => l.id === draggedListId);
     if (fromIdx === -1) return;
 
