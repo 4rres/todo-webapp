@@ -9,14 +9,18 @@
 </head>
 <body>
   <div id="app">
-    <div class="tabs-bar">
-      <div id="tabs" class="tabs"></div>
-      <button id="btn-add-workspace" class="tab-add" title="Nuovo workspace">+</button>
+    <div class="app-header">
+      <div class="tabs-bar">
+        <div id="tabs" class="tabs"></div>
+        <button id="btn-add-workspace" class="tab-add" title="Nuovo workspace">+</button>
+      </div>
+      <div class="toolbar">
+        <input type="color" id="input-bg-color" class="color-dot" title="Colore sfondo" value="#f0ebe0">
+        <span id="workspace-title" class="workspace-title"></span>
+        <button id="btn-add-list" class="btn-new">+ Nuova lista</button>
+      </div>
     </div>
-    <div class="toolbar">
-      <span id="workspace-title" class="workspace-title"></span>
-      <button id="btn-add-list" class="btn-new">+ Nuova lista</button>
-    </div>
+    <div id="loading" class="loading">Caricamento…</div>
     <div id="workspace" class="workspace"></div>
   </div>
 
