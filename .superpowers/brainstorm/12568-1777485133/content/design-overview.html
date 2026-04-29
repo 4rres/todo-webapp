@@ -1,0 +1,127 @@
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+.section { margin-bottom: 28px; }
+h3 { font-size: 15px; font-weight: 600; color: #2a2a2a; margin-bottom: 10px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+
+/* App preview */
+.app-shell { background: #f0ebe0; border-radius: 10px; overflow: hidden; border: 1px solid #ddd8cc; }
+.app-tabs { display: flex; gap: 3px; padding: 8px 12px 0; background: #e5e0d5; }
+.app-tab { padding: 5px 12px; border-radius: 5px 5px 0 0; font-size: 12px; font-weight: 500; cursor: pointer; background: transparent; color: #888; }
+.app-tab.active { background: #f0ebe0; color: #333; }
+.app-tab-add { padding: 5px 8px; font-size: 14px; color: #aaa; background: none; }
+.app-toolbar { padding: 10px 14px; display: flex; align-items: center; }
+.app-title { font-size: 15px; font-weight: 600; color: #2a2a2a; flex: 1; text-align: center; }
+.btn-sm { background: white; border: 1px solid #ddd; border-radius: 5px; padding: 4px 10px; font-size: 11px; color: #555; cursor: pointer; }
+.app-workspace { padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+.dump-card { background: white; border-radius: 8px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.dump-card .ct { font-weight: 600; font-size: 12px; color: #2a2a2a; margin-bottom: 6px; }
+.ti { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 11px; color: #555; }
+.ti input { width: 11px; height: 11px; accent-color: #7c6f5c; flex-shrink: 0; }
+.grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.pc { background: white; border-radius: 8px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.pc .ct { font-weight: 600; font-size: 11px; color: #2a2a2a; margin-bottom: 5px; }
+.tag { font-size: 9px; padding: 1px 5px; border-radius: 6px; font-weight: 500; margin-left: auto; flex-shrink: 0; }
+.tg-blue { background: #dbeafe; color: #2563eb; }
+.tg-amber { background: #fef3c7; color: #d97706; }
+.tg-purple { background: #ede9fe; color: #7c3aed; }
+
+/* Feature pills */
+.features { display: flex; flex-wrap: wrap; gap: 8px; }
+.feat { background: white; border: 1px solid #e0dbd0; border-radius: 20px; padding: 5px 12px; font-size: 12px; color: #444; display: flex; align-items: center; gap: 5px; }
+.feat .icon { font-size: 14px; }
+
+/* Stack */
+.stack-row { display: flex; gap: 10px; }
+.stack-item { flex: 1; background: white; border-radius: 8px; padding: 12px; border: 1px solid #e0dbd0; }
+.stack-item h4 { font-size: 12px; font-weight: 600; color: #2a2a2a; margin-bottom: 4px; }
+.stack-item p { font-size: 11px; color: #777; line-height: 1.4; }
+.stack-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #d1fae5; color: #059669; font-weight: 500; margin-top: 4px; }
+</style>
+
+<h2>Design completo della webapp</h2>
+<p class="subtitle">Struttura, funzionalità, stack — tutto in un colpo</p>
+
+<!-- APP PREVIEW -->
+<div class="section">
+  <h3>Anteprima layout</h3>
+  <div class="app-shell">
+    <div class="app-tabs">
+      <div class="app-tab active">Lista</div>
+      <div class="app-tab">Teatro 2026</div>
+      <div class="app-tab">Fotografia</div>
+      <div class="app-tab-add">+</div>
+    </div>
+    <div class="app-toolbar">
+      <button class="btn-sm">+ Nuova lista</button>
+      <div class="app-title">Lista</div>
+    </div>
+    <div class="app-workspace">
+      <div class="dump-card" style="width:100%">
+        <div class="ct">⬛ Vario — dump generale</div>
+        <div class="ti"><input type="checkbox"> <span>chiamare banca rinnovo</span> <span class="tag tg-amber">in attesa</span></div>
+        <div class="ti"><input type="checkbox"> <span>email collaborazione adriana</span> <span class="tag tg-blue">in corso</span></div>
+        <div class="ti"><input type="checkbox" checked> <span style="text-decoration:line-through;color:#aaa">bcp rinnovo</span></div>
+      </div>
+      <div class="grid4">
+        <div class="pc">
+          <div class="ct">Ortona</div>
+          <div class="ti"><input type="checkbox"> <span>6 ragazzi tecnici</span> <span class="tag tg-blue">in corso</span></div>
+          <div class="ti"><input type="checkbox"> <span>allestimento luci</span> <span class="tag tg-purple">revisione</span></div>
+        </div>
+        <div class="pc">
+          <div class="ct">Banche fondi</div>
+          <div class="ti"><input type="checkbox"> <span>lista potenziali fondi</span></div>
+          <div class="ti"><input type="checkbox"> <span>documento personalizzato</span></div>
+        </div>
+        <div class="pc">
+          <div class="ct">BUIO</div>
+          <div class="ti"><input type="checkbox"> <span>capire drammaturgia</span></div>
+          <div class="ti"><input type="checkbox"> <span>parlare con dafne</span> <span class="tag tg-amber">in attesa</span></div>
+        </div>
+        <div class="pc">
+          <div class="ct">Bando Intesa</div>
+          <div class="ti"><input type="checkbox"> <span>capire se serve aps</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<div class="section">
+  <h3>Funzionalità incluse</h3>
+  <div class="features">
+    <div class="feat"><span class="icon">🗂️</span> Tab per ogni progetto/workspace</div>
+    <div class="feat"><span class="icon">⬛</span> Card dump a tutta larghezza (sopra)</div>
+    <div class="feat"><span class="icon">⊞</span> Griglia 4 colonne con card ridimensionabili</div>
+    <div class="feat"><span class="icon">☑️</span> Checkbox con etichette: in corso · in attesa · revisione</div>
+    <div class="feat"><span class="icon">↕️</span> Drag & drop task tra card</div>
+    <div class="feat"><span class="icon">✏️</span> Modifica inline titoli e task</div>
+    <div class="feat"><span class="icon">🔄</span> Sync realtime cross-device</div>
+    <div class="feat"><span class="icon">📱</span> Responsive (tablet + desktop)</div>
+  </div>
+</div>
+
+<!-- STACK -->
+<div class="section">
+  <h3>Stack tecnico — tutto gratuito</h3>
+  <div class="stack-row">
+    <div class="stack-item">
+      <h4>Netlify</h4>
+      <p>Hosting del sito statico. Deploy automatico ad ogni git push.</p>
+      <span class="stack-badge">gratis</span>
+    </div>
+    <div class="stack-item">
+      <h4>Supabase</h4>
+      <p>Database Postgres + sync realtime. Chiamato direttamente dal browser.</p>
+      <span class="stack-badge">gratis</span>
+    </div>
+    <div class="stack-item">
+      <h4>Vanilla JS + HTML/CSS</h4>
+      <p>Nessun framework. Leggero, facile da modificare, nessuna dipendenza da aggiornare.</p>
+      <span class="stack-badge">zero deps</span>
+    </div>
+  </div>
+</div>

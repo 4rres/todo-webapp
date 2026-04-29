@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todo</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+  <div id="app">
+    <div class="tabs-bar">
+      <div id="tabs" class="tabs"></div>
+      <button id="btn-add-workspace" class="tab-add" title="Nuovo workspace">+</button>
+    </div>
+    <div class="toolbar">
+      <span id="workspace-title" class="workspace-title"></span>
+      <button id="btn-add-list" class="btn-new">+ Nuova lista</button>
+    </div>
+    <div id="workspace" class="workspace"></div>
+  </div>
+
+  <script>
+    window.SUPABASE_URL = 'https://lswzfntwrelcrmbltltc.supabase.co';
+    window.SUPABASE_ANON_KEY = 'sb_publishable_IPH74O50VALta9pGe15iwQ_7j_STtQb';
+  </script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
