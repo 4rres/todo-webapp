@@ -15,19 +15,21 @@ const state = {
 const $ = id => document.getElementById(id);
 
 // ── Status ──
-const STATUS_ORDER = ['pending', 'in_progress', 'waiting', 'review', 'done'];
 const STATUS_LABELS = {
   pending: null,
   in_progress: 'in corso',
   waiting: 'in attesa',
   review: 'revisione',
+  paused: 'in pausa',
   done: 'fatto'
 };
 
+const TAG_CYCLE = ['in_progress', 'waiting', 'review', 'paused'];
+
 function nextStatus(current) {
-  if (current === 'done') return 'pending';
-  const idx = STATUS_ORDER.indexOf(current);
-  return STATUS_ORDER[(idx + 1) % STATUS_ORDER.length];
+  if (current === 'pending' || current === 'done') return 'in_progress';
+  const idx = TAG_CYCLE.indexOf(current);
+  return TAG_CYCLE[(idx + 1) % TAG_CYCLE.length];
 }
 
 function escapeHtml(str) {
@@ -43,14 +45,38 @@ function renderTabs() {
   const container = $('tabs');
   container.innerHTML = state.workspaces.map(w => `
     <button class="tab ${w.id === state.activeWorkspaceId ? 'active' : ''}"
-            data-id="${w.id}">${escapeHtml(w.name)}</button>
+            data-id="${w.id}">
+      ${escapeHtml(w.name)}
+      <span class="tab-close" data-id="${w.id}" title="Elimina workspace">×</span>
+    </button>
   `).join('');
 
   container.querySelectorAll('.tab').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', e => {
+      if (e.target.classList.contains('tab-close')) return;
       if (btn.dataset.id !== state.activeWorkspaceId) setActiveWorkspace(btn.dataset.id);
     });
-    btn.addEventListener('dblclick', () => renameWorkspace(btn.dataset.id));
+    btn.addEventListener('dblclick', e => {
+      if (e.target.classList.contains('tab-close')) return;
+      renameWorkspace(btn.dataset.id);
+    });
+  });
+
+  container.querySelectorAll('.tab-close').forEach(x => {
+    x.addEventListener('click', async e => {
+      e.stopPropagation();
+      const id = x.dataset.id;
+      if (state.workspaces.length === 1) { alert('Non puoi eliminare l\'unico workspace.'); return; }
+      const ws = state.workspaces.find(w => w.id === id);
+      if (!confirm(`Eliminare il workspace "${ws.name}" e tutte le sue liste?`)) return;
+      await deleteWorkspace(id);
+      state.workspaces = state.workspaces.filter(w => w.id !== id);
+      if (state.activeWorkspaceId === id) {
+        await setActiveWorkspace(state.workspaces[0].id);
+      } else {
+        renderTabs();
+      }
+    });
   });
 
   const active = state.workspaces.find(w => w.id === state.activeWorkspaceId);
@@ -67,7 +93,8 @@ function renderWorkspace() {
     .sort((a, b) => a.position - b.position);
 
   const dump = lists.find(l => l.is_dump);
-  const regular = lists.filter(l => !l.is_dump);
+  const completati = lists.find(l => l.is_completed);
+  const regular = lists.filter(l => !l.is_dump && !l.is_completed);
 
   container.innerHTML = '';
 
@@ -76,13 +103,24 @@ function renderWorkspace() {
   if (regular.length) {
     const grid = document.createElement('div');
     grid.className = 'cards-grid';
-    regular.forEach(l => grid.appendChild(renderCard(l)));
+    const cols = Array.from({ length: 4 }, () => {
+      const col = document.createElement('div');
+      col.className = 'grid-col';
+      grid.appendChild(col);
+      return col;
+    });
+    regular.forEach((l, i) => cols[i % 4].appendChild(renderCard(l)));
+    bindGridDrag(grid);
     container.appendChild(grid);
   } else if (!dump) {
     const empty = document.createElement('div');
     empty.className = 'empty-state';
     empty.textContent = 'Nessuna lista. Clicca "+ Nuova lista" per iniziare.';
     container.appendChild(empty);
+  }
+
+  if (completati && state.tasks.some(t => t.list_id === completati.id)) {
+    container.appendChild(renderCard(completati));
   }
 }
 
@@ -95,41 +133,48 @@ function renderCard(list) {
   const done = tasks.filter(t => t.status === 'done').length;
 
   const card = document.createElement('div');
-  card.className = `card${list.is_dump ? ' dump' : ''}`;
+  const isSpecial = list.is_dump || list.is_completed;
+  card.className = `card${list.is_dump ? ' dump' : ''}${list.is_completed ? ' dump completati' : ''}`;
   card.dataset.listId = list.id;
-  if (!list.is_dump) card.dataset.cols = list.width_cols;
+  if (!isSpecial) card.dataset.cols = list.width_cols;
+
+  const collapsed = getCollapsedIds().has(list.id);
+  if (collapsed) card.classList.add('collapsed');
 
   card.innerHTML = `
     <div class="card-header">
-      <input class="card-title" value="${escapeHtml(list.name)}" data-list-id="${list.id}">
-      <button class="card-menu" data-list-id="${list.id}" title="Elimina lista">⋯</button>
+      ${!isSpecial ? `<span class="card-drag-handle" draggable="true" title="Sposta lista">⠿</span>` : ''}
+      <input class="card-title" value="${escapeHtml(list.name)}" data-list-id="${list.id}"${list.is_completed ? ' readonly' : ''}>
+      <button class="card-toggle" title="Comprimi/espandi">❯</button>
+      ${!list.is_completed ? `<button class="card-menu" data-list-id="${list.id}" title="Elimina lista">⋯</button>` : ''}
     </div>
     ${tasks.length ? `<div class="progress-text">${done}/${tasks.length} completati</div>` : ''}
     <div class="task-list" data-list-id="${list.id}">
-      ${tasks.map(t => renderTaskHtml(t)).join('')}
+      ${tasks.map(t => renderTaskHtml(t, !list.is_completed)).join('')}
     </div>
+    ${!list.is_completed ? `
     <div class="add-task-row">
       <span style="color:#ccc;font-size:13px;flex-shrink:0">+</span>
       <input class="add-task-input" placeholder="Aggiungi task…" data-list-id="${list.id}">
-    </div>
-    ${!list.is_dump ? `<div class="resize-handle" data-list-id="${list.id}"></div>` : ''}
+    </div>` : ''}
   `;
 
   bindCardEvents(card, list);
   return card;
 }
 
-function renderTaskHtml(task) {
-  const hasStatus = task.status !== 'pending';
+function renderTaskHtml(task, draggable = true) {
+  const hasStatus = task.status !== 'pending' && task.status !== 'done';
   const tagClass = hasStatus ? `tag-${task.status}` : 'tag-empty';
   const tagLabel = hasStatus ? STATUS_LABELS[task.status] : '···';
   return `
     <div class="task-item ${task.status === 'done' ? 'done' : ''}"
-         draggable="true" data-task-id="${task.id}" data-list-id="${task.list_id}">
+         ${draggable ? 'draggable="true"' : ''} data-task-id="${task.id}" data-list-id="${task.list_id}">
       <input type="checkbox" ${task.status === 'done' ? 'checked' : ''} data-task-id="${task.id}">
-      <span class="task-text" contenteditable="true"
+      <span class="task-text" contenteditable="${draggable}"
             data-task-id="${task.id}">${escapeHtml(task.text)}</span>
-      <span class="tag ${tagClass}" data-task-id="${task.id}">${tagLabel}</span>
+      ${draggable ? `<span class="tag ${tagClass}" data-task-id="${task.id}">${tagLabel}</span>` : ''}
+      <button class="task-delete" data-task-id="${task.id}" title="Elimina task">×</button>
     </div>
   `;
 }
@@ -150,34 +195,68 @@ function bindCardEvents(card, list) {
     if (e.key === 'Enter') titleInput.blur();
   });
 
-  // Delete list
-  card.querySelector('.card-menu').addEventListener('click', async () => {
-    if (!confirm(`Eliminare la lista "${list.name}"?`)) return;
-    await deleteList(list.id);
-    state.lists = state.lists.filter(l => l.id !== list.id);
-    state.tasks = state.tasks.filter(t => t.list_id !== list.id);
-    renderWorkspace();
+  // Collapse/expand toggle
+  card.querySelector('.card-toggle').addEventListener('click', () => {
+    const isCollapsed = card.classList.toggle('collapsed');
+    setCollapsed(list.id, isCollapsed);
   });
+
+  // Delete list
+  const menuBtn = card.querySelector('.card-menu');
+  if (menuBtn) {
+    menuBtn.addEventListener('click', async () => {
+      if (!confirm(`Eliminare la lista "${list.name}"?`)) return;
+      await deleteList(list.id);
+      state.lists = state.lists.filter(l => l.id !== list.id);
+      state.tasks = state.tasks.filter(t => t.list_id !== list.id);
+      renderWorkspace();
+    });
+  }
 
   // Add task on Enter
   const addInput = card.querySelector('.add-task-input');
-  addInput.addEventListener('keydown', async e => {
-    if (e.key !== 'Enter' || !addInput.value.trim()) return;
-    const text = addInput.value.trim();
-    addInput.value = '';
-    const pos = state.tasks.filter(t => t.list_id === list.id).length;
-    const task = await createTask(list.id, text, pos);
-    state.tasks.push(task);
-    renderWorkspace();
-  });
+  if (addInput) {
+    addInput.addEventListener('keydown', async e => {
+      if (e.key !== 'Enter' || !addInput.value.trim()) return;
+      const text = addInput.value.trim();
+      addInput.value = '';
+      const pos = state.tasks.filter(t => t.list_id === list.id).length;
+      const task = await createTask(list.id, text, pos);
+      state.tasks.push(task);
+      renderWorkspace();
+    });
+  }
 
   // Checkbox toggle
   card.querySelectorAll('input[type="checkbox"]').forEach(cb => {
     cb.addEventListener('change', async () => {
       const task = state.tasks.find(t => t.id === cb.dataset.taskId);
       if (!task) return;
-      task.status = cb.checked ? 'done' : 'pending';
-      await updateTask(task.id, { status: task.status });
+      const completatiList = state.lists.find(l => l.workspace_id === state.activeWorkspaceId && l.is_completed);
+      if (cb.checked) {
+        if (completatiList && task.list_id !== completatiList.id) {
+          const originalListId = task.list_id;
+          task.original_list_id = originalListId;
+          task.list_id = completatiList.id;
+          task.status = 'done';
+          await updateTask(task.id, { status: 'done', list_id: completatiList.id, original_list_id: originalListId });
+        } else {
+          task.status = 'done';
+          await updateTask(task.id, { status: 'done' });
+        }
+      } else {
+        if (completatiList && task.list_id === completatiList.id) {
+          const dumpList = state.lists.find(l => l.workspace_id === state.activeWorkspaceId && l.is_dump);
+          const targetListId = task.original_list_id || dumpList?.id || task.list_id;
+          task.list_id = targetListId;
+          task.status = 'pending';
+          task.original_list_id = null;
+          await updateTask(task.id, { status: 'pending', list_id: targetListId, original_list_id: null });
+        } else {
+          task.status = 'pending';
+          await updateTask(task.id, { status: 'pending' });
+        }
+      }
       renderWorkspace();
     });
   });
@@ -191,6 +270,17 @@ function bindCardEvents(card, list) {
       if (task.status === 'done') return;
       task.status = nextStatus(task.status);
       await updateTask(task.id, { status: task.status });
+      renderWorkspace();
+    });
+  });
+
+  // Delete task
+  card.querySelectorAll('.task-delete').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      const id = btn.dataset.taskId;
+      await deleteTask(id);
+      state.tasks = state.tasks.filter(t => t.id !== id);
       renderWorkspace();
     });
   });
@@ -214,12 +304,15 @@ function bindCardEvents(card, list) {
     });
   });
 
+  // Card drag (header only, non-dump/non-completed)
+  if (!list.is_dump && !list.is_completed) bindCardDrag(card, list);
+
   // Resize handle
   const handle = card.querySelector('.resize-handle');
   if (handle) bindResizeHandle(handle, card, list);
 
-  // Drag & drop
-  bindDragDrop(card);
+  // Drag & drop (not for completati — tasks managed via checkbox only)
+  if (!list.is_completed) bindDragDrop(card);
 }
 
 // ── Workspace management ──
@@ -230,8 +323,13 @@ async function setActiveWorkspace(id) {
   state.tasks = listIds.length ? await fetchTasks(listIds) : [];
 
   if (!state.lists.find(l => l.is_dump)) {
-    const dump = await createList(id, 'Vario', 0, true);
+    const dump = await createList(id, 'Vario', 0, true, false);
     state.lists.unshift(dump);
+  }
+
+  if (!state.lists.find(l => l.is_completed)) {
+    const completati = await createList(id, 'Completati', 999, false, true);
+    state.lists.push(completati);
   }
 
   renderTabs();
@@ -247,7 +345,35 @@ function renameWorkspace(id) {
   renderTabs();
 }
 
+function getCollapsedIds() {
+  return new Set(JSON.parse(localStorage.getItem('collapsed-lists') || '[]'));
+}
+function setCollapsed(id, collapsed) {
+  const ids = getCollapsedIds();
+  if (collapsed) ids.add(id); else ids.delete(id);
+  localStorage.setItem('collapsed-lists', JSON.stringify([...ids]));
+}
+
+function applyBgColor(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const darker = `rgb(${Math.max(0,r-12)},${Math.max(0,g-11)},${Math.max(0,b-9)})`;
+  document.documentElement.style.setProperty('--bg', hex);
+  document.documentElement.style.setProperty('--bg-tabs', darker);
+}
+
 function bindGlobalEvents() {
+  const colorInput = $('input-bg-color');
+  const savedColor = localStorage.getItem('bg-color') || '#f0ebe0';
+  colorInput.value = savedColor;
+  applyBgColor(savedColor);
+
+  colorInput.addEventListener('input', () => {
+    applyBgColor(colorInput.value);
+    localStorage.setItem('bg-color', colorInput.value);
+  });
+
   $('btn-add-workspace').addEventListener('click', async () => {
     const name = prompt('Nome del nuovo workspace:');
     if (!name) return;
@@ -271,6 +397,7 @@ function bindGlobalEvents() {
 
 // ── Drag & drop ──
 let draggedTaskId = null;
+let draggedListId = null;
 
 function bindDragDrop(card) {
   const taskList = card.querySelector('.task-list');
@@ -287,18 +414,23 @@ function bindDragDrop(card) {
     });
   });
 
-  taskList.addEventListener('dragover', e => {
+  card.addEventListener('dragover', e => {
+    if (draggedListId) return;
     e.preventDefault();
     document.querySelectorAll('.task-item.drag-over-top').forEach(el => el.classList.remove('drag-over-top'));
     const after = getDragAfterElement(taskList, e.clientY);
     if (after) after.classList.add('drag-over-top');
   });
 
-  taskList.addEventListener('dragleave', () => {
-    document.querySelectorAll('.task-item.drag-over-top').forEach(el => el.classList.remove('drag-over-top'));
+  card.addEventListener('dragleave', e => {
+    if (draggedListId) return;
+    if (!card.contains(e.relatedTarget)) {
+      document.querySelectorAll('.task-item.drag-over-top').forEach(el => el.classList.remove('drag-over-top'));
+    }
   });
 
-  taskList.addEventListener('drop', async e => {
+  card.addEventListener('drop', async e => {
+    if (draggedListId) return;
     e.preventDefault();
     document.querySelectorAll('.task-item.drag-over-top').forEach(el => el.classList.remove('drag-over-top'));
     if (!draggedTaskId) return;
@@ -334,6 +466,76 @@ function getDragAfterElement(container, y) {
     if (offset < 0 && offset > closest.offset) return { offset, element: child };
     return closest;
   }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+// ── Card drag & drop (reorder lists) ──
+function bindCardDrag(card, list) {
+  const handle = card.querySelector('.card-drag-handle');
+  if (!handle) return;
+
+  handle.addEventListener('dragstart', e => {
+    e.stopPropagation();
+    draggedListId = list.id;
+    draggedTaskId = null;
+    card.classList.add('card-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+
+  handle.addEventListener('dragend', () => {
+    card.classList.remove('card-dragging');
+    document.querySelectorAll('.card.card-drag-over').forEach(el => el.classList.remove('card-drag-over'));
+    draggedListId = null;
+  });
+}
+
+function bindGridDrag(grid) {
+  grid.addEventListener('dragover', e => {
+    if (!draggedListId) return;
+    e.preventDefault();
+    const target = e.target.closest('.card');
+    document.querySelectorAll('.card.card-drag-over').forEach(el => el.classList.remove('card-drag-over'));
+    if (target && target.dataset.listId !== draggedListId) target.classList.add('card-drag-over');
+  });
+
+  grid.addEventListener('dragleave', e => {
+    if (!grid.contains(e.relatedTarget)) {
+      document.querySelectorAll('.card.card-drag-over').forEach(el => el.classList.remove('card-drag-over'));
+    }
+  });
+
+  grid.addEventListener('drop', async e => {
+    if (!draggedListId) return;
+    e.preventDefault();
+    document.querySelectorAll('.card.card-drag-over').forEach(el => el.classList.remove('card-drag-over'));
+
+    const targetCard = e.target.closest('.card');
+    const targetCol = e.target.closest('.grid-col');
+    if (!targetCard && !targetCol) return;
+    if (targetCard && targetCard.dataset.listId === draggedListId) return;
+
+    const regular = state.lists.filter(l => !l.is_dump).sort((a, b) => a.position - b.position);
+    const fromIdx = regular.findIndex(l => l.id === draggedListId);
+    if (fromIdx === -1) return;
+
+    let toIdx;
+    if (targetCard) {
+      toIdx = regular.findIndex(l => l.id === targetCard.dataset.listId);
+    } else {
+      // Dropped on empty column — move to end of that column's position
+      const colIndex = [...grid.querySelectorAll('.grid-col')].indexOf(targetCol);
+      // Find the last card currently in that column (index % 4 === colIndex)
+      let lastInCol = -1;
+      regular.forEach((l, i) => { if (i % 4 === colIndex) lastInCol = i; });
+      toIdx = lastInCol === -1 ? colIndex : lastInCol + 1;
+      if (toIdx > regular.length) toIdx = regular.length;
+    }
+    if (toIdx === -1) return;
+
+    const [moved] = regular.splice(fromIdx, 1);
+    regular.splice(toIdx, 0, moved);
+    await Promise.all(regular.map((l, i) => { l.position = i; return updateList(l.id, { position: i }); }));
+    renderWorkspace();
+  });
 }
 
 // ── Card resize ──
@@ -372,48 +574,53 @@ function bindResizeHandle(handle, card, list) {
 
 // ── Realtime handlers ──
 function handleRealtimeWorkspace({ eventType, new: rec, old }) {
+  let changed = false;
   if (eventType === 'INSERT') {
-    if (!state.workspaces.find(w => w.id === rec.id)) state.workspaces.push(rec);
+    if (!state.workspaces.find(w => w.id === rec.id)) { state.workspaces.push(rec); changed = true; }
   } else if (eventType === 'UPDATE') {
     const idx = state.workspaces.findIndex(w => w.id === rec.id);
-    if (idx !== -1) state.workspaces[idx] = rec;
+    if (idx !== -1) { state.workspaces[idx] = rec; changed = true; }
   } else if (eventType === 'DELETE') {
     state.workspaces = state.workspaces.filter(w => w.id !== old.id);
-    if (state.activeWorkspaceId === old.id) {
-      state.activeWorkspaceId = state.workspaces[0]?.id ?? null;
-    }
+    if (state.activeWorkspaceId === old.id) state.activeWorkspaceId = state.workspaces[0]?.id ?? null;
+    changed = true;
   }
-  renderTabs();
-  renderWorkspace();
+  if (changed) { renderTabs(); renderWorkspace(); }
 }
 
 function handleRealtimeList({ eventType, new: rec, old }) {
+  let changed = false;
   if (eventType === 'INSERT') {
-    if (!state.lists.find(l => l.id === rec.id)) state.lists.push(rec);
+    if (!state.lists.find(l => l.id === rec.id)) { state.lists.push(rec); changed = true; }
   } else if (eventType === 'UPDATE') {
     const idx = state.lists.findIndex(l => l.id === rec.id);
-    if (idx !== -1) state.lists[idx] = rec;
+    if (idx !== -1) { state.lists[idx] = rec; changed = true; }
   } else if (eventType === 'DELETE') {
     state.lists = state.lists.filter(l => l.id !== old.id);
     state.tasks = state.tasks.filter(t => t.list_id !== old.id);
+    changed = true;
   }
-  renderWorkspace();
+  if (changed) renderWorkspace();
 }
 
 function handleRealtimeTask({ eventType, new: rec, old }) {
+  let changed = false;
   if (eventType === 'INSERT') {
-    if (!state.tasks.find(t => t.id === rec.id)) state.tasks.push(rec);
+    if (!state.tasks.find(t => t.id === rec.id)) { state.tasks.push(rec); changed = true; }
   } else if (eventType === 'UPDATE') {
     const idx = state.tasks.findIndex(t => t.id === rec.id);
-    if (idx !== -1) state.tasks[idx] = rec;
+    if (idx !== -1) { state.tasks[idx] = rec; changed = true; }
   } else if (eventType === 'DELETE') {
+    const before = state.tasks.length;
     state.tasks = state.tasks.filter(t => t.id !== old.id);
+    changed = state.tasks.length !== before;
   }
-  renderWorkspace();
+  if (changed) renderWorkspace();
 }
 
 // ── Init ──
 async function init() {
+  const loading = $('loading');
   state.workspaces = await fetchWorkspaces();
   if (!state.workspaces.length) {
     const ws = await createWorkspace('Lista', 0);
@@ -422,6 +629,7 @@ async function init() {
   bindGlobalEvents();
   subscribeToChanges(handleRealtimeWorkspace, handleRealtimeList, handleRealtimeTask);
   await setActiveWorkspace(state.workspaces[0].id);
+  loading.classList.add('hidden');
 }
 
 init();

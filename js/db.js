@@ -39,10 +39,10 @@ export async function fetchLists(workspaceId) {
   return data;
 }
 
-export async function createList(workspaceId, name, position, isDump = false) {
+export async function createList(workspaceId, name, position, isDump = false, isCompleted = false) {
   const { data, error } = await supabase
     .from('lists')
-    .insert({ workspace_id: workspaceId, name, position, is_dump: isDump })
+    .insert({ workspace_id: workspaceId, name, position, is_dump: isDump, is_completed: isCompleted })
     .select().single();
   if (error) throw error;
   return data;
