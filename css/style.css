@@ -5,6 +5,7 @@
   --bg-tabs: #e5e0d5;
   --card-bg: #ffffff;
   --border: #ddd8cc;
+  --border-light: #e8e3d8;
   --text: #2a2a2a;
   --text-muted: #888;
   --shadow: 0 1px 4px rgba(0,0,0,0.07);
@@ -21,6 +22,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: var(--text);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* ── Sticky header ── */
@@ -113,17 +115,28 @@ body {
 }
 .btn-new:hover { background: #f8f5ee; }
 
-.color-dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid rgba(0,0,0,0.15);
+/* ── Color picker button ── */
+.color-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
   cursor: pointer;
+  color: var(--text-muted);
   flex-shrink: 0;
-  padding: 0;
-  transition: transform 120ms ease;
+  transition: background 120ms, color 120ms;
+  position: relative;
 }
-.color-dot:hover { transform: scale(1.15); }
+.color-btn:hover { background: rgba(0,0,0,0.06); color: var(--text); }
+.color-btn input[type="color"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
 
 /* ── Workspace ── */
 .workspace {
@@ -284,7 +297,7 @@ body {
 .tag {
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: 8px;
+  border-radius: 20px;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -292,7 +305,7 @@ body {
   user-select: none;
   border: 1px solid transparent;
 }
-.tag-empty { color: #ccc; background: none; border-color: #e8e3d8; }
+.tag-empty { color: #ccc; background: none; border-color: var(--border-light); }
 .tag-in_progress { background: var(--tag-progress-bg); color: var(--tag-progress-fg); }
 .tag-waiting     { background: var(--tag-waiting-bg);  color: var(--tag-waiting-fg); }
 .tag-review      { background: var(--tag-review-bg);   color: var(--tag-review-fg); }
@@ -304,8 +317,9 @@ body {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 4px 4px;
-  margin-top: 4px;
+  padding: 5px 4px 2px;
+  margin-top: 6px;
+  border-top: 1px solid var(--border-light);
 }
 .add-task-input {
   flex: 1;
@@ -325,6 +339,7 @@ body {
   margin-bottom: 6px;
 }
 
+/* ── Width button ── */
 .card-width-btn {
   opacity: 0;
   background: none;
@@ -342,34 +357,12 @@ body {
 .card:hover .card-width-btn { opacity: 1; }
 .card-width-btn:hover { color: var(--text); background: #f0ebe0; }
 
-/* ── Resize handle ── */
-.resize-handle {
-  position: absolute;
-  right: -5px;
-  top: 15%;
-  height: 70%;
-  width: 10px;
-  cursor: col-resize;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 100ms;
-  z-index: 10;
-}
-.card:hover .resize-handle { opacity: 1; }
-.resize-handle::after {
-  content: '';
-  width: 3px;
-  height: 28px;
-  background: var(--border);
-  border-radius: 2px;
-}
+/* ── Resize handle (legacy) ── */
+.resize-handle { display: none; }
 
 /* ── Completati card ── */
 .card.completati {
   border-top: 2px solid #a7f3d0;
-  margin-top: 4px;
 }
 .card.completati .card-title {
   cursor: default;
