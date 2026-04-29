@@ -135,17 +135,15 @@ body {
 
 /* ── Cards grid ── */
 .cards-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-  align-items: flex-start;
+  align-items: start;
 }
-.grid-col {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 48px;
-}
+.card[data-cols="1"] { grid-column: span 1; }
+.card[data-cols="2"] { grid-column: span 2; }
+.card[data-cols="3"] { grid-column: span 3; }
+.card[data-cols="4"] { grid-column: span 4; }
 
 /* ── Card ── */
 .card {
@@ -326,6 +324,23 @@ body {
   color: var(--text-muted);
   margin-bottom: 6px;
 }
+
+.card-width-btn {
+  opacity: 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 1px 6px;
+  transition: opacity 100ms;
+  flex-shrink: 0;
+  line-height: 1.6;
+}
+.card:hover .card-width-btn { opacity: 1; }
+.card-width-btn:hover { color: var(--text); background: #f0ebe0; }
 
 /* ── Resize handle ── */
 .resize-handle {

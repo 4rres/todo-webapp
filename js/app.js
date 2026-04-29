@@ -105,14 +105,8 @@ function renderWorkspace() {
   if (regular.length || hasCompletati) {
     const grid = document.createElement('div');
     grid.className = 'cards-grid';
-    const cols = Array.from({ length: 4 }, () => {
-      const col = document.createElement('div');
-      col.className = 'grid-col';
-      grid.appendChild(col);
-      return col;
-    });
-    regular.forEach((l, i) => cols[i % 4].appendChild(renderCard(l)));
-    if (hasCompletati) cols[regular.length % 4].appendChild(renderCard(completati));
+    regular.forEach(l => grid.appendChild(renderCard(l)));
+    if (hasCompletati) grid.appendChild(renderCard(completati));
     bindGridDrag(grid);
     container.appendChild(grid);
   } else if (!dump) {
@@ -132,19 +126,19 @@ function renderCard(list) {
   const done = tasks.filter(t => t.status === 'done').length;
 
   const card = document.createElement('div');
-  const isSpecial = list.is_dump || list.is_completed;
   card.className = `card${list.is_dump ? ' dump' : ''}${list.is_completed ? ' completati' : ''}`;
   card.dataset.listId = list.id;
-  if (!isSpecial) card.dataset.cols = list.width_cols;
+  if (!list.is_dump) card.dataset.cols = getListWidth(list.id);
 
   const collapsed = getCollapsedIds().has(list.id);
   if (collapsed) card.classList.add('collapsed');
 
   card.innerHTML = `
     <div class="card-header">
-      ${!isSpecial ? `<span class="card-drag-handle" draggable="true" title="Sposta lista">⠿</span>` : ''}
+      ${!list.is_dump && !list.is_completed ? `<span class="card-drag-handle" draggable="true" title="Sposta lista">⠿</span>` : ''}
       <input class="card-title" value="${escapeHtml(list.name)}" data-list-id="${list.id}"${list.is_completed ? ' readonly' : ''}>
       <button class="card-toggle" title="Comprimi/espandi">❯</button>
+      ${!list.is_dump ? `<button class="card-width-btn" title="Cambia larghezza (1-4 colonne)">${getListWidth(list.id)}</button>` : ''}
       ${!list.is_completed ? `<button class="card-menu" data-list-id="${list.id}" title="Elimina lista">⋯</button>` : ''}
     </div>
     ${tasks.length ? `<div class="progress-text">${done}/${tasks.length} completati</div>` : ''}
@@ -235,6 +229,7 @@ function bindCardEvents(card, list) {
       if (cb.checked) {
         if (completatiList && task.list_id !== completatiList.id) {
           const originalListId = task.list_id;
+          saveTaskStatus(task.id, task.status);
           task.original_list_id = originalListId;
           task.list_id = completatiList.id;
           task.status = 'done';
@@ -247,10 +242,12 @@ function bindCardEvents(card, list) {
         if (completatiList && task.list_id === completatiList.id) {
           const dumpList = state.lists.find(l => l.workspace_id === state.activeWorkspaceId && l.is_dump);
           const targetListId = task.original_list_id || dumpList?.id || task.list_id;
+          const restoredStatus = getTaskStatus(task.id);
+          clearTaskStatus(task.id);
           task.list_id = targetListId;
-          task.status = 'pending';
+          task.status = restoredStatus;
           task.original_list_id = null;
-          await updateTask(task.id, { status: 'pending', list_id: targetListId, original_list_id: null });
+          await updateTask(task.id, { status: restoredStatus, list_id: targetListId, original_list_id: null });
         } else {
           task.status = 'pending';
           await updateTask(task.id, { status: 'pending' });
@@ -303,6 +300,17 @@ function bindCardEvents(card, list) {
     });
   });
 
+  // Width button — cycles 1→2→3→4→1
+  const widthBtn = card.querySelector('.card-width-btn');
+  if (widthBtn) {
+    widthBtn.addEventListener('click', () => {
+      const next = (getListWidth(list.id) % 4) + 1;
+      setListWidth(list.id, next);
+      card.dataset.cols = next;
+      widthBtn.textContent = next;
+    });
+  }
+
   // Card drag (header only, non-dump/non-completed)
   if (!list.is_dump && !list.is_completed) bindCardDrag(card, list);
 
@@ -351,6 +359,29 @@ function setCollapsed(id, collapsed) {
   const ids = getCollapsedIds();
   if (collapsed) ids.add(id); else ids.delete(id);
   localStorage.setItem('collapsed-lists', JSON.stringify([...ids]));
+}
+
+function getListWidth(listId) {
+  return JSON.parse(localStorage.getItem('list-widths') || '{}')[listId] || 1;
+}
+function setListWidth(listId, cols) {
+  const widths = JSON.parse(localStorage.getItem('list-widths') || '{}');
+  widths[listId] = cols;
+  localStorage.setItem('list-widths', JSON.stringify(widths));
+}
+
+function saveTaskStatus(taskId, status) {
+  const s = JSON.parse(localStorage.getItem('task-original-status') || '{}');
+  s[taskId] = status;
+  localStorage.setItem('task-original-status', JSON.stringify(s));
+}
+function getTaskStatus(taskId) {
+  return JSON.parse(localStorage.getItem('task-original-status') || '{}')[taskId] || 'pending';
+}
+function clearTaskStatus(taskId) {
+  const s = JSON.parse(localStorage.getItem('task-original-status') || '{}');
+  delete s[taskId];
+  localStorage.setItem('task-original-status', JSON.stringify(s));
 }
 
 function applyBgColor(hex) {
@@ -508,27 +539,12 @@ function bindGridDrag(grid) {
     document.querySelectorAll('.card.card-drag-over').forEach(el => el.classList.remove('card-drag-over'));
 
     const targetCard = e.target.closest('.card');
-    const targetCol = e.target.closest('.grid-col');
-    if (!targetCard && !targetCol) return;
-    if (targetCard && targetCard.dataset.listId === draggedListId) return;
+    if (!targetCard || targetCard.dataset.listId === draggedListId) return;
 
     const regular = state.lists.filter(l => !l.is_dump && !l.is_completed).sort((a, b) => a.position - b.position);
     const fromIdx = regular.findIndex(l => l.id === draggedListId);
-    if (fromIdx === -1) return;
-
-    let toIdx;
-    if (targetCard) {
-      toIdx = regular.findIndex(l => l.id === targetCard.dataset.listId);
-    } else {
-      // Dropped on empty column — move to end of that column's position
-      const colIndex = [...grid.querySelectorAll('.grid-col')].indexOf(targetCol);
-      // Find the last card currently in that column (index % 4 === colIndex)
-      let lastInCol = -1;
-      regular.forEach((l, i) => { if (i % 4 === colIndex) lastInCol = i; });
-      toIdx = lastInCol === -1 ? colIndex : lastInCol + 1;
-      if (toIdx > regular.length) toIdx = regular.length;
-    }
-    if (toIdx === -1) return;
+    const toIdx = regular.findIndex(l => l.id === targetCard.dataset.listId);
+    if (fromIdx === -1 || toIdx === -1) return;
 
     const [moved] = regular.splice(fromIdx, 1);
     regular.splice(toIdx, 0, moved);
