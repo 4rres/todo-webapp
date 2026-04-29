@@ -411,13 +411,24 @@ function openTabMenu(btnEl) {
   dropdown.innerHTML = state.workspaces.map(w => `
     <div class="tab-dropdown-item">
       <span class="tab-dropdown-name">${escapeHtml(w.name)}</span>
-      <button class="tab-dropdown-delete" data-id="${w.id}">Elimina</button>
+      <div class="tab-dropdown-actions">
+        <button class="tab-dropdown-rename" data-id="${w.id}">Rinomina</button>
+        <button class="tab-dropdown-delete" data-id="${w.id}">Elimina</button>
+      </div>
     </div>
   `).join('');
 
   const rect = btnEl.getBoundingClientRect();
-  dropdown.style.cssText = `position:fixed;top:${rect.bottom + 4}px;left:${rect.left - 120}px;`;
+  dropdown.style.cssText = `position:fixed;top:${rect.bottom + 4}px;left:${rect.left - 160}px;`;
   document.body.appendChild(dropdown);
+
+  dropdown.querySelectorAll('.tab-dropdown-rename').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      dropdown.remove();
+      renameWorkspace(btn.dataset.id);
+    });
+  });
 
   dropdown.querySelectorAll('.tab-dropdown-delete').forEach(btn => {
     btn.addEventListener('click', async e => {
