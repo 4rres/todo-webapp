@@ -44,7 +44,7 @@ function escapeHtml(str) {
 function renderTabs() {
   const container = $('tabs');
   container.innerHTML = state.workspaces.map(w => `
-    <button class="tab ${w.id === state.activeWorkspaceId ? 'active' : ''}" data-id="${w.id}">
+    <button class="tab ${w.id === state.activeWorkspaceId ? 'active' : ''}" data-id="${w.id}" draggable="true">
       ${escapeHtml(w.name)}
     </button>
   `).join('');
@@ -54,6 +54,37 @@ function renderTabs() {
       if (btn.dataset.id !== state.activeWorkspaceId) setActiveWorkspace(btn.dataset.id);
     });
     btn.addEventListener('dblclick', () => renameWorkspace(btn.dataset.id));
+
+    btn.addEventListener('dragstart', e => {
+      draggedTabId = btn.dataset.id;
+      btn.classList.add('tab-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    btn.addEventListener('dragend', () => {
+      btn.classList.remove('tab-dragging');
+      container.querySelectorAll('.tab-drag-over').forEach(t => t.classList.remove('tab-drag-over'));
+      draggedTabId = null;
+    });
+    btn.addEventListener('dragover', e => {
+      if (!draggedTabId || btn.dataset.id === draggedTabId) return;
+      e.preventDefault();
+      container.querySelectorAll('.tab-drag-over').forEach(t => t.classList.remove('tab-drag-over'));
+      btn.classList.add('tab-drag-over');
+    });
+    btn.addEventListener('drop', async e => {
+      e.preventDefault();
+      if (!draggedTabId || btn.dataset.id === draggedTabId) return;
+      container.querySelectorAll('.tab-drag-over').forEach(t => t.classList.remove('tab-drag-over'));
+
+      const from = state.workspaces.findIndex(w => w.id === draggedTabId);
+      const to = state.workspaces.findIndex(w => w.id === btn.dataset.id);
+      if (from === -1 || to === -1) return;
+
+      const [moved] = state.workspaces.splice(from, 1);
+      state.workspaces.splice(to, 0, moved);
+      await Promise.all(state.workspaces.map((w, i) => { w.position = i; return updateWorkspace(w.id, { position: i }); }));
+      renderTabs();
+    });
   });
 
   const active = state.workspaces.find(w => w.id === state.activeWorkspaceId);
@@ -451,6 +482,7 @@ function bindGlobalEvents() {
 // ── Drag & drop ──
 let draggedTaskId = null;
 let draggedListId = null;
+let draggedTabId = null;
 
 function bindDragDrop(card) {
   const taskList = card.querySelector('.task-list');

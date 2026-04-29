@@ -68,6 +68,8 @@ body {
 }
 .tab:hover { color: var(--text); }
 .tab.active { background: var(--bg); color: var(--text); }
+.tab.tab-dragging { opacity: 0.35; }
+.tab.tab-drag-over { background: rgba(255,255,255,0.5); outline: 2px solid var(--border); outline-offset: -2px; }
 .tab-add {
   padding: 6px 10px;
   font-size: 18px;
