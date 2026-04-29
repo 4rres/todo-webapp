@@ -44,39 +44,16 @@ function escapeHtml(str) {
 function renderTabs() {
   const container = $('tabs');
   container.innerHTML = state.workspaces.map(w => `
-    <button class="tab ${w.id === state.activeWorkspaceId ? 'active' : ''}"
-            data-id="${w.id}">
+    <button class="tab ${w.id === state.activeWorkspaceId ? 'active' : ''}" data-id="${w.id}">
       ${escapeHtml(w.name)}
-      <span class="tab-close" data-id="${w.id}" title="Elimina workspace">×</span>
     </button>
   `).join('');
 
   container.querySelectorAll('.tab').forEach(btn => {
-    btn.addEventListener('click', e => {
-      if (e.target.classList.contains('tab-close')) return;
+    btn.addEventListener('click', () => {
       if (btn.dataset.id !== state.activeWorkspaceId) setActiveWorkspace(btn.dataset.id);
     });
-    btn.addEventListener('dblclick', e => {
-      if (e.target.classList.contains('tab-close')) return;
-      renameWorkspace(btn.dataset.id);
-    });
-  });
-
-  container.querySelectorAll('.tab-close').forEach(x => {
-    x.addEventListener('click', async e => {
-      e.stopPropagation();
-      const id = x.dataset.id;
-      if (state.workspaces.length === 1) { alert('Non puoi eliminare l\'unico workspace.'); return; }
-      const ws = state.workspaces.find(w => w.id === id);
-      if (!confirm(`Eliminare il workspace "${ws.name}" e tutte le sue liste?`)) return;
-      await deleteWorkspace(id);
-      state.workspaces = state.workspaces.filter(w => w.id !== id);
-      if (state.activeWorkspaceId === id) {
-        await setActiveWorkspace(state.workspaces[0].id);
-      } else {
-        renderTabs();
-      }
-    });
+    btn.addEventListener('dblclick', () => renameWorkspace(btn.dataset.id));
   });
 
   const active = state.workspaces.find(w => w.id === state.activeWorkspaceId);
@@ -393,6 +370,47 @@ function applyBgColor(hex) {
   document.documentElement.style.setProperty('--bg-tabs', darker);
 }
 
+function openTabMenu(btnEl) {
+  const existing = document.getElementById('tab-dropdown');
+  if (existing) { existing.remove(); return; }
+
+  const dropdown = document.createElement('div');
+  dropdown.id = 'tab-dropdown';
+  dropdown.className = 'tab-dropdown';
+  dropdown.innerHTML = state.workspaces.map(w => `
+    <div class="tab-dropdown-item">
+      <span class="tab-dropdown-name">${escapeHtml(w.name)}</span>
+      <button class="tab-dropdown-delete" data-id="${w.id}">Elimina</button>
+    </div>
+  `).join('');
+
+  const rect = btnEl.getBoundingClientRect();
+  dropdown.style.cssText = `position:fixed;top:${rect.bottom + 4}px;left:${rect.left - 120}px;`;
+  document.body.appendChild(dropdown);
+
+  dropdown.querySelectorAll('.tab-dropdown-delete').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      if (state.workspaces.length === 1) { alert('Non puoi eliminare l\'unico workspace.'); return; }
+      const ws = state.workspaces.find(w => w.id === id);
+      if (!confirm(`Eliminare il workspace "${ws.name}" e tutte le sue liste?`)) return;
+      dropdown.remove();
+      await deleteWorkspace(id);
+      state.workspaces = state.workspaces.filter(w => w.id !== id);
+      if (state.activeWorkspaceId === id) {
+        await setActiveWorkspace(state.workspaces[0].id);
+      } else {
+        renderTabs();
+      }
+    });
+  });
+
+  setTimeout(() => {
+    document.addEventListener('click', () => document.getElementById('tab-dropdown')?.remove(), { once: true });
+  }, 0);
+}
+
 function bindGlobalEvents() {
   const colorInput = $('input-bg-color');
   const savedColor = localStorage.getItem('bg-color') || '#f0ebe0';
@@ -402,6 +420,11 @@ function bindGlobalEvents() {
   colorInput.addEventListener('input', () => {
     applyBgColor(colorInput.value);
     localStorage.setItem('bg-color', colorInput.value);
+  });
+
+  $('btn-tab-menu').addEventListener('click', e => {
+    e.stopPropagation();
+    openTabMenu(e.currentTarget);
   });
 
   $('btn-add-workspace').addEventListener('click', async () => {
