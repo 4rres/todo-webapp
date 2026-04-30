@@ -225,6 +225,7 @@ function bindCardEvents(card, list) {
       const task = await createTask(list.id, text, pos);
       state.tasks.push(task);
       renderWorkspace();
+      document.querySelector(`.add-task-input[data-list-id="${list.id}"]`)?.focus();
     });
   }
 
