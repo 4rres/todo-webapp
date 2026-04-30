@@ -20,7 +20,7 @@ const STATUS_LABELS = {
   in_progress: 'in corso',
   waiting: 'in attesa',
   review: 'revisione',
-  paused: 'in pausa',
+  paused: 'da fare',
   done: 'fatto'
 };
 

@@ -13,7 +13,7 @@
   --tag-progress-bg: #dbeafe; --tag-progress-fg: #1d4ed8;
   --tag-waiting-bg: #fef3c7;  --tag-waiting-fg: #b45309;
   --tag-review-bg: #ede9fe;   --tag-review-fg: #6d28d9;
-  --tag-paused-bg: #f1f5f9;   --tag-paused-fg: #475569;
+  --tag-paused-bg: #fee2e2;   --tag-paused-fg: #dc2626;
   --tag-done-bg: #d1fae5;     --tag-done-fg: #047857;
 }
 
