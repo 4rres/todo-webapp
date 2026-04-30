@@ -173,7 +173,7 @@ function renderTaskHtml(task, draggable = true) {
          ${draggable ? 'draggable="true"' : ''} data-task-id="${task.id}" data-list-id="${task.list_id}">
       <input type="checkbox" ${task.status === 'done' ? 'checked' : ''} data-task-id="${task.id}">
       <span class="task-text" contenteditable="${draggable}"
-            data-task-id="${task.id}">${escapeHtml(task.text)}</span>
+            data-task-id="${task.id}">${task.text}</span>
       ${draggable ? `<span class="tag ${tagClass}" data-task-id="${task.id}">${tagLabel}</span>` : ''}
       <button class="task-delete" data-task-id="${task.id}" title="Elimina task">×</button>
     </div>
@@ -294,17 +294,17 @@ function bindCardEvents(card, list) {
     span.addEventListener('blur', async () => {
       const task = state.tasks.find(t => t.id === span.dataset.taskId);
       if (!task) return;
-      const newText = span.textContent.trim();
+      const newText = span.innerHTML.trim();
       if (newText && newText !== task.text) {
         task.text = newText;
         await updateTask(task.id, { text: newText });
       } else if (!newText) {
-        span.textContent = task.text;
+        span.innerHTML = task.text;
       }
     });
     span.addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); span.blur(); }
-      if (e.key === 'Escape') { span.textContent = state.tasks.find(t => t.id === span.dataset.taskId)?.text || ''; span.blur(); }
+      if (e.key === 'Escape') { span.innerHTML = state.tasks.find(t => t.id === span.dataset.taskId)?.text || ''; span.blur(); }
     });
   });
 
