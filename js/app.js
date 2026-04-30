@@ -24,10 +24,10 @@ const STATUS_LABELS = {
   done: 'fatto'
 };
 
-const TAG_CYCLE = ['in_progress', 'waiting', 'review', 'paused'];
+const TAG_CYCLE = ['in_progress', 'waiting', 'review', 'paused', 'pending'];
 
 function nextStatus(current) {
-  if (current === 'pending' || current === 'done') return 'in_progress';
+  if (current === 'done') return 'in_progress';
   const idx = TAG_CYCLE.indexOf(current);
   return TAG_CYCLE[(idx + 1) % TAG_CYCLE.length];
 }
