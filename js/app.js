@@ -334,6 +334,7 @@ function bindCardEvents(card, list) {
 // ── Workspace management ──
 async function setActiveWorkspace(id) {
   state.activeWorkspaceId = id;
+  localStorage.setItem('active-workspace', id);
   state.lists = await fetchLists(id);
   const listIds = state.lists.map(l => l.id);
   state.tasks = listIds.length ? await fetchTasks(listIds) : [];
@@ -710,7 +711,9 @@ async function init() {
   }
   bindGlobalEvents();
   subscribeToChanges(handleRealtimeWorkspace, handleRealtimeList, handleRealtimeTask);
-  await setActiveWorkspace(state.workspaces[0].id);
+  const savedId = localStorage.getItem('active-workspace');
+  const startId = state.workspaces.find(w => w.id === savedId)?.id ?? state.workspaces[0].id;
+  await setActiveWorkspace(startId);
   loading.classList.add('hidden');
 }
 
