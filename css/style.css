@@ -387,8 +387,11 @@ body {
 .card:hover .card-drag-handle { opacity: 0.5; }
 .card-drag-handle:hover { opacity: 1 !important; }
 .card-drag-handle:active { cursor: grabbing; }
-.card.card-dragging { opacity: 0.35; transform: scale(0.98); }
-.card.card-drag-over { outline: 2px solid var(--accent); outline-offset: 3px; }
+.card.card-dragging {
+  opacity: 0.97;
+  cursor: grabbing;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.22);
+}
 
 /* ── Task items ── */
 .task-list { display: flex; flex-direction: column; gap: 1px; min-height: 24px; }
@@ -404,10 +407,23 @@ body {
   border-radius: 8px;
   transition: background var(--press), transform var(--press);
 }
+.task-item { user-select: none; }         /* evita selezioni accidentali durante il drag */
 .task-item:hover { background: rgba(0,0,0,0.045); }
-.task-item:active { transform: scale(0.995); }
-.task-item.dragging { opacity: 0.4; cursor: grabbing; }
-.task-item.drag-over-top { box-shadow: inset 0 2px 0 var(--accent); }
+.task-item.dragging {
+  cursor: grabbing;
+  background: var(--card-bg, #fff);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  opacity: 0.97;
+}
+
+/* Segnaposto che mostra dove cadrà l'elemento trascinato */
+.drag-placeholder {
+  border-radius: 10px;
+  background: rgba(0,0,0,0.05);
+  border: 1.5px dashed rgba(0,0,0,0.18);
+  margin: 2px 0;
+}
 
 .task-item input[type="checkbox"] {
   appearance: none;
@@ -442,6 +458,7 @@ body {
   outline: none;
   word-break: break-word;
   min-width: 0;
+  user-select: text;        /* il testo resta selezionabile in modifica */
 }
 .task-item.done .task-text {
   text-decoration: line-through;
@@ -556,6 +573,77 @@ body {
   font-size: 13px;
   padding: 44px 0;
 }
+
+/* ── Modali in-pagina ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0,0,0,0.14);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+  transition: opacity 160ms var(--ease-out);
+}
+.modal-overlay.open { opacity: 1; }
+.modal {
+  width: 100%;
+  max-width: 340px;
+  background: var(--glass-strong, #fff);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--glass-edge);
+  border-radius: 18px;
+  box-shadow: var(--shadow-pop);
+  padding: 20px;
+  transform: scale(0.94);
+  transition: transform 200ms var(--ease-out);
+}
+.modal-overlay.open .modal { transform: scale(1); }
+.modal-msg {
+  font-size: 14.5px;
+  font-weight: 550;
+  color: var(--text);
+  line-height: 1.4;
+  margin-bottom: 14px;
+}
+.modal-input {
+  width: 100%;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: rgba(0,0,0,0.04);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 9px 11px;
+  margin-bottom: 16px;
+  outline: none;
+  transition: border-color var(--press), background var(--press);
+}
+.modal-input:focus { border-color: rgba(0,0,0,0.25); background: rgba(0,0,0,0.02); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.modal-btn {
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: rgba(0,0,0,0.03);
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--press), transform var(--press), filter var(--press);
+}
+.modal-btn:hover { background: rgba(0,0,0,0.07); }
+.modal-btn:active { transform: scale(0.96); }
+.modal-btn.primary { background: var(--accent); border-color: transparent; color: #fff; }
+.modal-btn.primary:hover { filter: brightness(1.05); background: var(--accent); }
+.modal-btn.danger { background: #ff3b30; border-color: transparent; color: #fff; }
+.modal-btn.danger:hover { filter: brightness(1.05); }
 
 /* ── Accessibilità: movimento e trasparenza ridotti (§14) ── */
 @media (prefers-reduced-motion: reduce) {

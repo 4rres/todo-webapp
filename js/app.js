@@ -143,7 +143,7 @@ function renderCard(list) {
 
   card.innerHTML = `
     <div class="card-header">
-      ${!list.is_dump && !list.is_completed ? `<span class="card-drag-handle" draggable="true" title="Sposta lista">⠿</span>` : ''}
+      ${!list.is_dump && !list.is_completed ? `<span class="card-drag-handle" title="Sposta lista">⠿</span>` : ''}
       <input class="card-title" value="${escapeHtml(list.name)}" data-list-id="${list.id}"${list.is_completed ? ' readonly' : ''}>
       <button class="card-toggle" title="Comprimi/espandi">❯</button>
       ${!list.is_dump ? `<button class="card-width-btn" title="Cambia larghezza (1-4 colonne)">${getListWidth(list.id)}</button>` : ''}
@@ -170,7 +170,7 @@ function renderTaskHtml(task, draggable = true) {
   const tagLabel = hasStatus ? STATUS_LABELS[task.status] : '···';
   return `
     <div class="task-item ${task.status === 'done' ? 'done' : ''}"
-         ${draggable ? 'draggable="true"' : ''} data-task-id="${task.id}" data-list-id="${task.list_id}">
+         data-task-id="${task.id}" data-list-id="${task.list_id}">
       <input type="checkbox" ${task.status === 'done' ? 'checked' : ''} data-task-id="${task.id}">
       <span class="task-text" contenteditable="${draggable}"
             data-task-id="${task.id}">${task.text}</span>
@@ -206,7 +206,7 @@ function bindCardEvents(card, list) {
   const menuBtn = card.querySelector('.card-menu');
   if (menuBtn) {
     menuBtn.addEventListener('click', async () => {
-      if (!confirm(`Eliminare la lista "${list.name}"?`)) return;
+      if (!(await showConfirm(`Eliminare la lista "${list.name}"?`))) return;
       await deleteList(list.id);
       state.lists = state.lists.filter(l => l.id !== list.id);
       state.tasks = state.tasks.filter(t => t.list_id !== list.id);
@@ -353,9 +353,9 @@ async function setActiveWorkspace(id) {
   renderWorkspace();
 }
 
-function renameWorkspace(id) {
+async function renameWorkspace(id) {
   const ws = state.workspaces.find(w => w.id === id);
-  const newName = prompt('Rinomina workspace:', ws.name);
+  const newName = await showPrompt('Rinomina workspace:', ws.name);
   if (!newName || newName === ws.name) return;
   ws.name = newName;
   updateWorkspace(id, { name: newName });
@@ -436,9 +436,9 @@ function openTabMenu(btnEl) {
     btn.addEventListener('click', async e => {
       e.stopPropagation();
       const id = btn.dataset.id;
-      if (state.workspaces.length === 1) { alert('Non puoi eliminare l\'unico workspace.'); return; }
+      if (state.workspaces.length === 1) { await showAlert('Non puoi eliminare l\'unico workspace.'); return; }
       const ws = state.workspaces.find(w => w.id === id);
-      if (!confirm(`Eliminare il workspace "${ws.name}" e tutte le sue liste?`)) return;
+      if (!(await showConfirm(`Eliminare il workspace "${ws.name}" e tutte le sue liste?`))) return;
       dropdown.remove();
       await deleteWorkspace(id);
       state.workspaces = state.workspaces.filter(w => w.id !== id);
@@ -472,7 +472,7 @@ function bindGlobalEvents() {
   });
 
   $('btn-add-workspace').addEventListener('click', async () => {
-    const name = prompt('Nome del nuovo workspace:');
+    const name = await showPrompt('Nome del nuovo workspace:');
     if (!name) return;
     const pos = state.workspaces.length;
     const ws = await createWorkspace(name, pos);
@@ -482,7 +482,7 @@ function bindGlobalEvents() {
 
   $('btn-add-list').addEventListener('click', async () => {
     if (!state.activeWorkspaceId) return;
-    const name = prompt('Nome della nuova lista:');
+    const name = await showPrompt('Nome della nuova lista:');
     if (!name) return;
     const regular = state.lists.filter(l => !l.is_dump);
     const pos = regular.length;
@@ -492,73 +492,28 @@ function bindGlobalEvents() {
   });
 }
 
-// ── Drag & drop ──
-let draggedTaskId = null;
-let draggedListId = null;
+// ── Drag & drop (Pointer Events: funziona anche nella webview di macOS,
+//    a differenza del drag-and-drop nativo HTML5) ──
 let draggedTabId = null;
+const DRAG_THRESHOLD = 6;
 
-function bindDragDrop(card) {
-  const taskList = card.querySelector('.task-list');
-
-  card.querySelectorAll('.task-item').forEach(item => {
-    item.addEventListener('dragstart', e => {
-      draggedTaskId = item.dataset.taskId;
-      item.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-    });
-    item.addEventListener('dragend', () => {
-      item.classList.remove('dragging');
-      document.querySelectorAll('.task-item.drag-over-top').forEach(el => el.classList.remove('drag-over-top'));
-    });
-  });
-
-  card.addEventListener('dragover', e => {
-    if (draggedListId) return;
-    e.preventDefault();
-    document.querySelectorAll('.task-item.drag-over-top').forEach(el => el.classList.remove('drag-over-top'));
-    const after = getDragAfterElement(taskList, e.clientY);
-    if (after) after.classList.add('drag-over-top');
-  });
-
-  card.addEventListener('dragleave', e => {
-    if (draggedListId) return;
-    if (!card.contains(e.relatedTarget)) {
-      document.querySelectorAll('.task-item.drag-over-top').forEach(el => el.classList.remove('drag-over-top'));
-    }
-  });
-
-  card.addEventListener('drop', async e => {
-    if (draggedListId) return;
-    e.preventDefault();
-    document.querySelectorAll('.task-item.drag-over-top').forEach(el => el.classList.remove('drag-over-top'));
-    if (!draggedTaskId) return;
-
-    const newListId = taskList.dataset.listId;
-    const task = state.tasks.find(t => t.id === draggedTaskId);
-    if (!task) return;
-
-    const dragging = document.querySelector('.task-item.dragging');
-    if (!dragging) return;
-    const after = getDragAfterElement(taskList, e.clientY);
-    if (!after) taskList.appendChild(dragging);
-    else taskList.insertBefore(dragging, after);
-
-    task.list_id = newListId;
-    const items = [...taskList.querySelectorAll('.task-item')];
-    const updates = items.map((el, i) => {
-      const t = state.tasks.find(t => t.id === el.dataset.taskId);
-      if (t) { t.position = i; t.list_id = newListId; }
-      return { id: el.dataset.taskId, list_id: newListId, position: i };
-    });
-
-    await Promise.all(updates.map(u => updateTask(u.id, { list_id: u.list_id, position: u.position })));
-    renderWorkspace();
-  });
+function floatElement(el, rect) {
+  el.style.position = 'fixed';
+  el.style.left = rect.left + 'px';
+  el.style.top = rect.top + 'px';
+  el.style.width = rect.width + 'px';
+  el.style.height = rect.height + 'px';
+  el.style.margin = '0';
+  el.style.zIndex = '9999';
+  el.style.pointerEvents = 'none';
+}
+function unfloatElement(el) {
+  for (const p of ['position','left','top','width','height','margin','zIndex','pointerEvents']) el.style[p] = '';
 }
 
-function getDragAfterElement(container, y) {
-  const draggable = [...container.querySelectorAll('.task-item:not(.dragging)')];
-  return draggable.reduce((closest, child) => {
+function taskAfterElement(container, y) {
+  const els = [...container.querySelectorAll('.task-item:not(.dragging)')];
+  return els.reduce((closest, child) => {
     const box = child.getBoundingClientRect();
     const offset = y - box.top - box.height / 2;
     if (offset < 0 && offset > closest.offset) return { offset, element: child };
@@ -566,60 +521,161 @@ function getDragAfterElement(container, y) {
   }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
-// ── Card drag & drop (reorder lists) ──
+function bindDragDrop(card) {
+  card.querySelectorAll('.task-item').forEach(item => {
+    item.addEventListener('pointerdown', e => onTaskPointerDown(e, item));
+  });
+}
+
+function onTaskPointerDown(e, item) {
+  if (e.button !== 0) return;
+  // non iniziare il drag dai controlli interattivi
+  if (e.target.closest('input, .tag, .task-delete')) return;
+
+  const startX = e.clientX, startY = e.clientY;
+  let dragging = false, placeholder = null, grabDX = 0, grabDY = 0;
+
+  const move = ev => {
+    if (!dragging) {
+      if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) < DRAG_THRESHOLD) return;
+      dragging = true;
+      const sel = window.getSelection && window.getSelection();
+      if (sel) sel.removeAllRanges();
+      item.querySelector('.task-text')?.blur?.();
+      const rect = item.getBoundingClientRect();
+      grabDX = startX - rect.left;
+      grabDY = startY - rect.top;
+      placeholder = document.createElement('div');
+      placeholder.className = 'drag-placeholder';
+      placeholder.style.height = rect.height + 'px';
+      item.after(placeholder);
+      item.classList.add('dragging');
+      floatElement(item, rect);
+      document.body.appendChild(item);
+    }
+    item.style.left = (ev.clientX - grabDX) + 'px';
+    item.style.top = (ev.clientY - grabDY) + 'px';
+
+    const under = document.elementFromPoint(ev.clientX, ev.clientY);
+    const overList = under && under.closest('.task-list');
+    if (overList) {
+      const rec = state.lists.find(l => l.id === overList.dataset.listId);
+      if (rec && rec.is_completed) return;   // i completati si gestiscono con la spunta
+      const after = taskAfterElement(overList, ev.clientY);
+      if (after) overList.insertBefore(placeholder, after);
+      else overList.appendChild(placeholder);
+    }
+  };
+
+  const up = async () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    if (!dragging) return;
+    const overList = placeholder.parentElement;
+    unfloatElement(item);
+    item.classList.remove('dragging');
+    overList.insertBefore(item, placeholder);
+    placeholder.remove();
+    await persistTaskMove(item, overList);
+  };
+
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+}
+
+async function persistTaskMove(item, taskList) {
+  const newListId = taskList.dataset.listId;
+  const task = state.tasks.find(t => t.id === item.dataset.taskId);
+  if (!task) { renderWorkspace(); return; }
+  const items = [...taskList.querySelectorAll('.task-item')];
+  const updates = items.map((el, i) => {
+    const t = state.tasks.find(t => t.id === el.dataset.taskId);
+    if (t) { t.position = i; t.list_id = newListId; }
+    return { id: el.dataset.taskId, list_id: newListId, position: i };
+  });
+  await Promise.all(updates.map(u => updateTask(u.id, { list_id: u.list_id, position: u.position })));
+  renderWorkspace();
+}
+
+// ── Card drag (riordino liste) con Pointer Events ──
 function bindCardDrag(card, list) {
   const handle = card.querySelector('.card-drag-handle');
   if (!handle) return;
-
-  handle.addEventListener('dragstart', e => {
-    e.stopPropagation();
-    draggedListId = list.id;
-    draggedTaskId = null;
-    card.classList.add('card-dragging');
-    e.dataTransfer.effectAllowed = 'move';
-  });
-
-  handle.addEventListener('dragend', () => {
-    card.classList.remove('card-dragging');
-    document.querySelectorAll('.card.card-drag-over').forEach(el => el.classList.remove('card-drag-over'));
-    draggedListId = null;
-  });
+  handle.addEventListener('pointerdown', e => onCardPointerDown(e, card, list));
 }
 
-function bindGridDrag(grid) {
-  grid.addEventListener('dragover', e => {
-    if (!draggedListId) return;
-    e.preventDefault();
-    const target = e.target.closest('.card');
-    document.querySelectorAll('.card.card-drag-over').forEach(el => el.classList.remove('card-drag-over'));
-    if (target && target.dataset.listId !== draggedListId) target.classList.add('card-drag-over');
-  });
+function onCardPointerDown(e, card, list) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const grid = card.parentElement;
+  if (!grid) return;
 
-  grid.addEventListener('dragleave', e => {
-    if (!grid.contains(e.relatedTarget)) {
-      document.querySelectorAll('.card.card-drag-over').forEach(el => el.classList.remove('card-drag-over'));
+  const startX = e.clientX, startY = e.clientY;
+  let dragging = false, placeholder = null, grabDX = 0, grabDY = 0;
+
+  const move = ev => {
+    if (!dragging) {
+      if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) < DRAG_THRESHOLD) return;
+      dragging = true;
+      const rect = card.getBoundingClientRect();
+      grabDX = startX - rect.left;
+      grabDY = startY - rect.top;
+      placeholder = document.createElement('div');
+      placeholder.className = 'drag-placeholder';
+      placeholder.style.height = rect.height + 'px';
+      placeholder.style.gridColumn = getComputedStyle(card).gridColumn;
+      card.after(placeholder);
+      card.classList.add('card-dragging');
+      floatElement(card, rect);
+      document.body.appendChild(card);
     }
-  });
+    card.style.left = (ev.clientX - grabDX) + 'px';
+    card.style.top = (ev.clientY - grabDY) + 'px';
 
-  grid.addEventListener('drop', async e => {
-    if (!draggedListId) return;
-    e.preventDefault();
-    document.querySelectorAll('.card.card-drag-over').forEach(el => el.classList.remove('card-drag-over'));
+    const under = document.elementFromPoint(ev.clientX, ev.clientY);
+    const overCard = under && under.closest('.card');
+    if (overCard && overCard !== placeholder && grid.contains(overCard)) {
+      const rec = state.lists.find(l => l.id === overCard.dataset.listId);
+      if (rec && (rec.is_dump || rec.is_completed)) return;  // non scambiare con Vario/Completati
+      const box = overCard.getBoundingClientRect();
+      const before = ev.clientY < box.top + box.height / 2;
+      grid.insertBefore(placeholder, before ? overCard : overCard.nextSibling);
+    }
+  };
 
-    const targetCard = e.target.closest('.card');
-    if (!targetCard || targetCard.dataset.listId === draggedListId) return;
+  const up = async () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    if (!dragging) return;
+    unfloatElement(card);
+    card.classList.remove('card-dragging');
+    grid.insertBefore(card, placeholder);
+    placeholder.remove();
+    await persistCardOrder(grid);
+  };
 
-    const regular = state.lists.filter(l => !l.is_dump && !l.is_completed).sort((a, b) => a.position - b.position);
-    const fromIdx = regular.findIndex(l => l.id === draggedListId);
-    const toIdx = regular.findIndex(l => l.id === targetCard.dataset.listId);
-    if (fromIdx === -1 || toIdx === -1) return;
-
-    const [moved] = regular.splice(fromIdx, 1);
-    regular.splice(toIdx, 0, moved);
-    await Promise.all(regular.map((l, i) => { l.position = i; return updateList(l.id, { position: i }); }));
-    renderWorkspace();
-  });
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
 }
+
+async function persistCardOrder(grid) {
+  const ids = [...grid.querySelectorAll('.card')]
+    .map(c => c.dataset.listId)
+    .filter(id => {
+      const rec = state.lists.find(l => l.id === id);
+      return rec && !rec.is_dump && !rec.is_completed;
+    });
+  const updates = ids.map((id, i) => {
+    const l = state.lists.find(x => x.id === id);
+    if (l) l.position = i;
+    return updateList(id, { position: i });
+  });
+  await Promise.all(updates);
+  renderWorkspace();
+}
+
+// Non più necessario (il card-drag è autonomo), mantenuto per compatibilità.
+function bindGridDrag(grid) {}
 
 // ── Card resize ──
 function bindResizeHandle(handle, card, list) {
@@ -699,6 +755,79 @@ function handleRealtimeTask({ eventType, new: rec, old }) {
     changed = state.tasks.length !== before;
   }
   if (changed) renderWorkspace();
+}
+
+// ── Modali in-pagina (la webview di macOS blocca confirm/prompt/alert nativi) ──
+function buildOverlay() {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `<div class="modal" role="dialog" aria-modal="true"></div>`;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+  return overlay;
+}
+
+function wireOverlay(overlay, resolve, { okValue, cancelValue }) {
+  const finish = v => {
+    overlay.classList.remove('open');
+    document.removeEventListener('keydown', onKey);
+    setTimeout(() => overlay.remove(), 160);
+    resolve(v);
+  };
+  const onOk = () => finish(typeof okValue === 'function' ? okValue() : okValue);
+  const onCancel = () => finish(cancelValue);
+  overlay.querySelector('[data-act="ok"]')?.addEventListener('click', onOk);
+  overlay.querySelector('[data-act="cancel"]')?.addEventListener('click', onCancel);
+  overlay.addEventListener('pointerdown', e => { if (e.target === overlay) onCancel(); });
+  function onKey(e) {
+    if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+    else if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onOk(); }
+  }
+  document.addEventListener('keydown', onKey);
+  const input = overlay.querySelector('.modal-input');
+  if (input) { input.focus(); input.select(); }
+}
+
+function showConfirm(message, { okLabel = 'Elimina', cancelLabel = 'Annulla', danger = true } = {}) {
+  return new Promise(resolve => {
+    const overlay = buildOverlay();
+    overlay.querySelector('.modal').innerHTML = `
+      <p class="modal-msg">${escapeHtml(message)}</p>
+      <div class="modal-actions">
+        <button class="modal-btn" data-act="cancel">${escapeHtml(cancelLabel)}</button>
+        <button class="modal-btn ${danger ? 'danger' : 'primary'}" data-act="ok">${escapeHtml(okLabel)}</button>
+      </div>`;
+    wireOverlay(overlay, resolve, { okValue: true, cancelValue: false });
+  });
+}
+
+function showPrompt(message, defaultValue = '', { okLabel = 'OK', cancelLabel = 'Annulla' } = {}) {
+  return new Promise(resolve => {
+    const overlay = buildOverlay();
+    overlay.querySelector('.modal').innerHTML = `
+      <p class="modal-msg">${escapeHtml(message)}</p>
+      <input class="modal-input" type="text" value="${escapeHtml(defaultValue)}">
+      <div class="modal-actions">
+        <button class="modal-btn" data-act="cancel">${escapeHtml(cancelLabel)}</button>
+        <button class="modal-btn primary" data-act="ok">${escapeHtml(okLabel)}</button>
+      </div>`;
+    wireOverlay(overlay, resolve, {
+      okValue: () => { const v = overlay.querySelector('.modal-input').value.trim(); return v || null; },
+      cancelValue: null,
+    });
+  });
+}
+
+function showAlert(message, { okLabel = 'OK' } = {}) {
+  return new Promise(resolve => {
+    const overlay = buildOverlay();
+    overlay.querySelector('.modal').innerHTML = `
+      <p class="modal-msg">${escapeHtml(message)}</p>
+      <div class="modal-actions">
+        <button class="modal-btn primary" data-act="ok">${escapeHtml(okLabel)}</button>
+      </div>`;
+    wireOverlay(overlay, resolve, { okValue: true, cancelValue: true });
+  });
 }
 
 // ── Init ──
