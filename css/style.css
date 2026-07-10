@@ -1,5 +1,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Response (§1/§10): niente flash grigio nativo al tocco — il feedback è la nostra scala :active */
+* { -webkit-tap-highlight-color: transparent; }
+
 /* Nessuna barra di scorrimento visibile: resta in overlay come su Chrome,
    così i box non vengono coperti né spinti fuori a destra */
 html, body {
@@ -10,21 +13,41 @@ html, body {
 ::-webkit-scrollbar-thumb { background: transparent; }
 
 :root {
-  --bg: #e8e5e0;
-  --bg-tabs: #e8e5e0;
-  --card-bg: #ffffff;
-  --border: #ccc8c0;
-  --border-light: #dedad4;
-  --text: #0d0d0d;
-  --text-muted: #999;
-  --shadow: 0 1px 4px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.04);
-  --radius: 13px;
-  --accent: #e53935;
-  --tag-progress-bg: #e8f0fe; --tag-progress-fg: #1a56c4;
-  --tag-waiting-bg: #fef3c7;  --tag-waiting-fg: #92640a;
-  --tag-review-bg: #ede9fe;   --tag-review-fg: #5b21b6;
-  --tag-paused-bg: #fde8e8;   --tag-paused-fg: #c62828;
-  --tag-done-bg: #dcfce7;     --tag-done-fg: #166534;
+  --bg: #f0ebe0;
+  --bg-tabs: #f0ebe0;
+
+  /* Materiali in vetro traslucido (§12) — poggiano sul colore di sfondo scelto dall'utente */
+  --glass:        rgba(255, 255, 255, 0.55);
+  --glass-strong: rgba(255, 255, 255, 0.72);
+  --glass-hover:  rgba(255, 255, 255, 0.68);
+  --glass-edge:   rgba(255, 255, 255, 0.65);   /* bordo luminoso in alto = luce sul materiale */
+  --hairline:     rgba(0, 0, 0, 0.06);
+
+  --text: #1a1a1a;
+  --text-muted: rgba(60, 60, 67, 0.6);          /* label vibranti su vetro (§12) */
+  --text-faint: rgba(60, 60, 67, 0.35);
+
+  /* Ombre morbide multi-livello: le superfici grandi leggono più spesse (§12) */
+  --shadow-card: 0 1px 1px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.05), 0 12px 28px rgba(0,0,0,0.04);
+  --shadow-lift: 0 2px 4px rgba(0,0,0,0.05), 0 10px 22px rgba(0,0,0,0.09), 0 22px 48px rgba(0,0,0,0.07);
+  --shadow-pop:  0 8px 32px rgba(0,0,0,0.14);
+
+  --radius: 18px;
+  --radius-sm: 10px;
+  --accent: #ff3b30;                             /* rosso di sistema iOS */
+
+  /* Curve custom: le native del browser sono troppo deboli (Emil) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);        /* ease-out forte per enter/feedback */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);    /* movimento su schermo */
+  --spring: 240ms var(--ease-out);
+  --spring-bounce: 300ms cubic-bezier(0.34, 1.3, 0.64, 1);  /* solo su click/gesto */
+  --press: 120ms var(--ease-out);
+
+  --tag-progress-bg: rgba(10, 132, 255, 0.14); --tag-progress-fg: #0a6bd6;
+  --tag-waiting-bg: rgba(255, 159, 10, 0.16);  --tag-waiting-fg: #a6650a;
+  --tag-review-bg: rgba(191, 90, 242, 0.16);   --tag-review-fg: #8324c4;
+  --tag-paused-bg: rgba(255, 59, 48, 0.14);    --tag-paused-fg: #c62828;
+  --tag-done-bg: rgba(52, 199, 89, 0.16);      --tag-done-fg: #1f8f46;
 }
 
 body {
@@ -32,16 +55,29 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: var(--text);
   min-height: 100vh;
+  line-height: 1.45;                    /* leading arioso sul corpo (§15) */
   -webkit-font-smoothing: antialiased;
-  letter-spacing: -0.01em;
+  font-optical-sizing: auto;            /* la forma del glifo segue la dimensione (§15) */
+  letter-spacing: -0.011em;
 }
 
-/* ── Sticky header ── */
+/* ── Sticky header: barra in vetro con contenuto che scorre sotto (§12) ── */
 .app-header {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: var(--bg);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+/* Scroll edge effect: sfumatura morbida dove il contenuto passa sotto la chrome (§12) */
+.app-header::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -14px;
+  height: 14px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 45%, transparent), transparent);
 }
 
 /* ── Loading ── */
@@ -59,75 +95,88 @@ body {
   align-items: center;
   gap: 2px;
   padding: 0 20px;
-  background: var(--bg);
-  border-bottom: 1.5px solid var(--border);
   height: 46px;
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.04);   /* hairline appena percettibile, non un divider netto */
 }
-.tabs { display: flex; gap: 0; align-items: center; height: 100%; }
+.tabs { display: flex; gap: 2px; align-items: center; height: 100%; }
 .tab {
-  padding: 0 24px;
-  height: 100%;
+  padding: 0 18px;
+  height: 32px;
   display: flex;
   align-items: center;
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 590;
   cursor: pointer;
   background: transparent;
   color: var(--text-muted);
   border: none;
   outline: none;
-  border-bottom: 2.5px solid transparent;
-  transition: color 120ms ease, border-color 120ms ease;
+  border-radius: 9px;
+  transition: color var(--press), background var(--press), transform var(--press);
   user-select: none;
   letter-spacing: -0.015em;
   position: relative;
-  top: 1px;
 }
-.tab:hover { color: var(--text); }
-.tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.tab:hover { color: var(--text); background: rgba(0,0,0,0.04); }
+.tab:active { transform: scale(0.96); }
+.tab.active {
+  color: var(--text);
+  background: var(--glass-strong);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06), inset 0 0.5px 0 var(--glass-edge);
+}
 .tab.tab-dragging { opacity: 0.35; }
-.tab.tab-drag-over { background: rgba(0,0,0,0.04); }
-.tab-add {
-  padding: 4px 10px;
+.tab.tab-drag-over { background: rgba(0,0,0,0.06); }
+.tab-add, .tab-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   font-size: 18px;
   color: var(--text-muted);
   background: none;
   border: none;
+  border-radius: 8px;
   cursor: pointer;
   line-height: 1;
+  transition: color var(--press), background var(--press), transform var(--press);
 }
-.tab-add:hover { color: var(--text); }
-.tab-menu-btn {
-  padding: 4px 10px;
-  font-size: 18px;
-  color: var(--text-muted);
-  background: none;
-  border: none;
-  cursor: pointer;
-  line-height: 1;
-  transition: color 120ms;
-}
-.tab-menu-btn:hover { color: var(--text); }
+.tab-add:hover, .tab-menu-btn:hover { color: var(--text); background: rgba(0,0,0,0.05); }
+.tab-add:active, .tab-menu-btn:active { transform: scale(0.9); }
 
-/* ── Tab dropdown ── */
+/* ── Tab dropdown: popover in vetro che nasce dal trigger (§7, §12) ── */
 .tab-dropdown {
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.10);
-  min-width: 200px;
-  padding: 5px;
+  background: var(--glass-strong);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid var(--glass-edge);
+  border-radius: 16px;
+  box-shadow: var(--shadow-pop);
+  min-width: 210px;
+  padding: 6px;
   z-index: 1000;
+  transform-origin: top right;
+  animation: popover-in 220ms var(--ease-out) both;
+}
+/* Materializza: blur + scala arrivano insieme, non solo l'opacità (§12) */
+@keyframes popover-in {
+  from { opacity: 0; transform: scale(0.95); backdrop-filter: blur(4px) saturate(120%); -webkit-backdrop-filter: blur(4px) saturate(120%); }
+  to   { opacity: 1; transform: scale(1);    backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); }
+}
+@keyframes popover-fade {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
 }
 .tab-dropdown-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 10px;
-  border-radius: 7px;
+  padding: 8px 10px;
+  border-radius: 9px;
   gap: 12px;
+  transition: background var(--press);
 }
-.tab-dropdown-item:hover { background: #f3f1ee; }
+.tab-dropdown-item:hover { background: rgba(0,0,0,0.05); }
 .tab-dropdown-name {
   font-size: 14px;
   font-weight: 500;
@@ -141,60 +190,64 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  padding: 2px 8px;
-  border-radius: 4px;
-  transition: background 100ms, color 100ms;
+  padding: 3px 9px;
+  border-radius: 7px;
+  transition: background var(--press), color var(--press), transform var(--press);
   white-space: nowrap;
 }
-.tab-dropdown-rename:hover { background: #eae7e2; color: var(--text); }
-.tab-dropdown-delete:hover { background: #fde8e8; color: #c62828; }
+.tab-dropdown-rename:hover { background: rgba(0,0,0,0.06); color: var(--text); }
+.tab-dropdown-delete:hover { background: var(--tag-paused-bg); color: #c62828; }
+.tab-dropdown-rename:active, .tab-dropdown-delete:active { transform: scale(0.94); }
 
 /* ── Toolbar ── */
 .toolbar {
   display: flex;
   align-items: center;
-  padding: 16px 20px 12px;
+  padding: 18px 20px 14px;
   gap: 12px;
 }
 .workspace-title {
   flex: 1;
   text-align: left;
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 800;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.035em;   /* tracking negativo sul testo grande (§15) */
   color: var(--text);
-  line-height: 1;
+  line-height: 1.02;
 }
 .btn-new {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 5px 13px;
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  border-radius: 10px;
+  padding: 6px 14px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 550;
   font-family: inherit;
-  color: var(--text-muted);
+  color: var(--text);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 120ms, color 120ms;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  transition: background var(--spring), transform var(--press), box-shadow var(--spring);
 }
-.btn-new:hover { background: rgba(0,0,0,0.05); color: var(--text); }
+.btn-new:hover { background: var(--glass-hover); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+.btn-new:active { transform: scale(0.96); }
 
 /* ── Color picker button ── */
 .color-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
   cursor: pointer;
   color: var(--text-muted);
   flex-shrink: 0;
-  transition: background 120ms, color 120ms;
+  transition: background var(--press), color var(--press), transform var(--press);
   position: relative;
 }
 .color-btn:hover { background: rgba(0,0,0,0.06); color: var(--text); }
+.color-btn:active { transform: scale(0.9); }
 .color-btn input[type="color"] {
   position: absolute;
   opacity: 0;
@@ -205,17 +258,17 @@ body {
 
 /* ── Workspace ── */
 .workspace {
-  padding: 0 20px 24px;
+  padding: 4px 20px 28px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 /* ── Cards grid ── */
 .cards-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 14px;
   align-items: start;
 }
 .card[data-cols="1"] { grid-column: span 1; }
@@ -223,15 +276,24 @@ body {
 .card[data-cols="3"] { grid-column: span 3; }
 .card[data-cols="4"] { grid-column: span 4; }
 
-/* ── Card ── */
+/* ── Card: superficie in vetro che galleggia (§12) ── */
 .card {
-  background: var(--card-bg);
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
   border-radius: var(--radius);
-  padding: 14px 16px;
-  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-card);
   position: relative;
-  transition: box-shadow 120ms ease;
-  border: 1px solid rgba(0,0,0,0.05);
+  border: 1px solid var(--glass-edge);
+  border-top-color: rgba(255,255,255,0.85);
+  transition: box-shadow var(--spring);
+}
+/* hover-lift solo con puntatore fine: sui touch il tap falsifica :hover (Emil).
+   Niente translateY: muovere una superficie con backdrop-filter ri-sfoca ogni frame.
+   La profondità arriva solo dall'ombra (GPU-safe). */
+@media (hover: hover) and (pointer: fine) {
+  .card:hover { box-shadow: var(--shadow-lift); }
 }
 .card.dump { width: 100%; }
 
@@ -239,11 +301,11 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .card-title {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 14.5px;
   letter-spacing: -0.02em;
   flex: 1;
   cursor: text;
@@ -252,10 +314,11 @@ body {
   background: transparent;
   color: var(--text);
   font-family: inherit;
-  padding: 1px 4px;
-  border-radius: 4px;
+  padding: 2px 5px;
+  border-radius: 7px;
+  transition: background var(--press);
 }
-.card-title:focus { background: #f3f1ee; }
+.card-title:focus { background: rgba(0,0,0,0.05); }
 
 .card-menu {
   opacity: 0;
@@ -264,13 +327,14 @@ body {
   cursor: pointer;
   font-size: 16px;
   color: var(--text-muted);
-  padding: 2px 5px;
-  border-radius: 4px;
-  transition: opacity 100ms;
+  padding: 3px 6px;
+  border-radius: 7px;
+  transition: opacity var(--spring), background var(--press), transform var(--press);
   line-height: 1;
 }
 .card:hover .card-menu { opacity: 1; }
-.card-menu:hover { background: #f0ede8; }
+.card-menu:hover { background: rgba(0,0,0,0.06); }
+.card-menu:active { transform: scale(0.88); }
 
 .card-toggle {
   background: none;
@@ -278,16 +342,16 @@ body {
   cursor: pointer;
   color: var(--text-muted);
   font-size: 16px;
-  padding: 1px 4px;
-  border-radius: 4px;
+  padding: 2px 5px;
+  border-radius: 7px;
   flex-shrink: 0;
-  transition: transform 150ms ease;
+  transition: transform var(--spring), opacity var(--spring), background var(--press);
   transform: rotate(90deg);
   opacity: 0.35;
   line-height: 1;
 }
 .card:hover .card-toggle { opacity: 0.7; }
-.card-toggle:hover { opacity: 1 !important; background: #f0ede8; }
+.card-toggle:hover { opacity: 1 !important; background: rgba(0,0,0,0.06); }
 .card.collapsed .card-toggle { transform: rotate(0deg); }
 .card.collapsed .progress-text,
 .card.collapsed .task-list,
@@ -298,7 +362,7 @@ body {
   color: var(--text-muted);
   font-size: 14px;
   opacity: 0;
-  transition: opacity 100ms;
+  transition: opacity var(--spring);
   user-select: none;
   flex-shrink: 0;
   padding: 0 2px;
@@ -306,33 +370,55 @@ body {
 .card:hover .card-drag-handle { opacity: 0.5; }
 .card-drag-handle:hover { opacity: 1 !important; }
 .card-drag-handle:active { cursor: grabbing; }
-.card.card-dragging { opacity: 0.35; }
-.card.card-drag-over { outline: 2px solid #b0aba2; outline-offset: 2px; }
+.card.card-dragging { opacity: 0.35; transform: scale(0.98); }
+.card.card-drag-over { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* ── Task items ── */
-.task-list { display: flex; flex-direction: column; gap: 2px; min-height: 24px; }
+.task-list { display: flex; flex-direction: column; gap: 1px; min-height: 24px; }
 
 .task-item {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 4px 4px;
+  gap: 8px;
+  padding: 5px 5px;
   font-size: 13.5px;
-  color: #333;
+  color: #2a2a2a;
   cursor: grab;
-  border-radius: 6px;
-  transition: background 100ms;
+  border-radius: 8px;
+  transition: background var(--press), transform var(--press);
 }
-.task-item:hover { background: #f5f3ef; }
+.task-item:hover { background: rgba(0,0,0,0.045); }
+.task-item:active { transform: scale(0.995); }
 .task-item.dragging { opacity: 0.4; cursor: grabbing; }
-.task-item.drag-over-top { border-top: 2px solid #b0aba2; }
+.task-item.drag-over-top { box-shadow: inset 0 2px 0 var(--accent); }
 
 .task-item input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 17px;
+  height: 17px;
   flex-shrink: 0;
   cursor: pointer;
-  accent-color: var(--accent);
+  border: 1.5px solid rgba(0,0,0,0.28);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.4);
+  position: relative;
+  transition: background var(--press), border-color var(--press), transform var(--press);
+}
+.task-item input[type="checkbox"]:hover { border-color: rgba(0,0,0,0.42); }
+.task-item input[type="checkbox"]:active { transform: scale(0.85); }
+.task-item input[type="checkbox"]:checked {
+  background: var(--tag-done-fg);
+  border-color: var(--tag-done-fg);
+}
+.task-item input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 5px; top: 2px;
+  width: 4px; height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(43deg);
 }
 .task-text {
   flex: 1;
@@ -342,7 +428,8 @@ body {
 }
 .task-item.done .task-text {
   text-decoration: line-through;
-  color: #bbb;
+  color: var(--text-faint);
+  transition: color var(--spring);
 }
 
 .task-delete {
@@ -352,28 +439,33 @@ body {
   cursor: pointer;
   font-size: 14px;
   color: var(--text-muted);
-  padding: 0 2px;
+  padding: 0 3px;
   line-height: 1;
   flex-shrink: 0;
-  transition: opacity 100ms, color 100ms;
+  border-radius: 5px;
+  transition: opacity var(--spring), color var(--press), transform var(--press);
 }
 .task-item:hover .task-delete { opacity: 0.4; }
-.task-delete:hover { opacity: 1 !important; color: #c0392b; }
+.task-delete:hover { opacity: 1 !important; color: var(--accent); }
+.task-delete:active { transform: scale(0.85); }
 
-/* ── Status tags ── */
+/* ── Status tags: pill traslucide (§12) ── */
 .tag {
   font-size: 10.5px;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 20px;
-  font-weight: 600;
+  font-weight: 650;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
   user-select: none;
   border: 1px solid transparent;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.005em;
+  transition: transform var(--press), filter var(--press);
 }
-.tag-empty { color: #bbb; background: none; border-color: var(--border-light); }
+.tag:hover { filter: brightness(0.97) saturate(1.1); }
+.tag:active { transform: scale(0.92); }
+.tag-empty { color: var(--text-faint); background: none; border-color: var(--hairline); }
 .tag-in_progress { background: var(--tag-progress-bg); color: var(--tag-progress-fg); }
 .tag-waiting     { background: var(--tag-waiting-bg);  color: var(--tag-waiting-fg); }
 .tag-review      { background: var(--tag-review-bg);   color: var(--tag-review-fg); }
@@ -384,10 +476,10 @@ body {
 .add-task-row {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 4px 2px;
-  margin-top: 6px;
-  border-top: 1px solid var(--border-light);
+  gap: 8px;
+  padding: 7px 5px 2px;
+  margin-top: 8px;
+  border-top: 1px solid var(--hairline);
 }
 .add-task-input {
   flex: 1;
@@ -396,41 +488,44 @@ body {
   background: transparent;
   font-size: 13px;
   font-family: inherit;
-  color: var(--text-muted);
+  color: var(--text);
 }
-.add-task-input::placeholder { color: #c8c4bc; }
+.add-task-input::placeholder { color: var(--text-faint); }
 
 /* ── Progress ── */
 .progress-text {
   font-size: 11px;
   color: var(--text-muted);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+  font-weight: 500;
 }
 
 /* ── Width button ── */
 .card-width-btn {
   opacity: 0;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  border-radius: 6px;
   cursor: pointer;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 650;
   color: var(--text-muted);
-  padding: 1px 6px;
-  transition: opacity 100ms;
+  padding: 1px 7px;
+  transition: opacity var(--spring), background var(--press), color var(--press), transform var(--press);
   flex-shrink: 0;
   line-height: 1.6;
 }
 .card:hover .card-width-btn { opacity: 1; }
-.card-width-btn:hover { color: var(--text); background: #f0ede8; }
+.card-width-btn:hover { color: var(--text); background: var(--glass-hover); }
+.card-width-btn:active { transform: scale(0.9); }
 
 /* ── Resize handle (legacy) ── */
 .resize-handle { display: none; }
 
 /* ── Completati card ── */
 .card.completati {
-  border-top: 2px solid #86efac;
+  background: rgba(255,255,255,0.4);
+  border-top: 1.5px solid rgba(52, 199, 89, 0.5);
 }
 .card.completati .card-title {
   cursor: default;
@@ -442,5 +537,25 @@ body {
   text-align: center;
   color: var(--text-muted);
   font-size: 13px;
-  padding: 40px 0;
+  padding: 44px 0;
+}
+
+/* ── Accessibilità: movimento e trasparenza ridotti (§14) ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 120ms !important;
+  }
+  .card:hover { transform: none; }
+  .tab:active, .btn-new:active, .tag:active,
+  .task-item input[type="checkbox"]:active { transform: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .app-header { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .card, .tab-dropdown {
+    background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none;
+  }
+  /* il keyframe animerebbe di nuovo il blur: qui resta solido, entrata a fade */
+  .tab-dropdown { animation: popover-fade 160ms var(--ease-out) both; }
+  .card.completati { background: #fafafa; }
 }
